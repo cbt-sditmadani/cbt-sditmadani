@@ -516,7 +516,11 @@ function exportGradesCSV(){
       <button className="primary" onClick={()=>{setPage('home');setStudent({name:'',class_name:'',code:''});setMsg('');}}>Kembali ke halaman awal</button>
     </section>}
 
-    <footer>© {new Date().getFullYear()} {SCHOOL_NAME} · CBT Sekolah</footer>
+    <footer>
+  © {new Date().getFullYear()} Hak Cipta Dilindungi.
+  <br/>
+  Dikembangkan oleh Irham Solehidin, S.Mat.
+</footer>
   </main>;
 }
 
