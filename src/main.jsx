@@ -23,6 +23,7 @@ function App(){
   const [editingExam,setEditingExam]=useState(null);
   const [draft,setDraft]=useState({type:'multiple_choice',prompt:'',options:['','','',''],correct_answer:'',points:1});
   const [draftImage,setDraftImage]=useState(null);
+  const [editingQuestion,setEditingQuestion]=useState(null);
   const [examQuestions,setExamQuestions]=useState([]);
   const [gradeRows,setGradeRows]=useState([]);
   const [reviewAttempt,setReviewAttempt]=useState(null);
@@ -77,12 +78,13 @@ function App(){
     const {error}=await supabase.from('exams').update({is_active:!e.is_active}).eq('id',e.id);
     if(error)setMsg(error.message);else loadExams();
   }
+
 async function addQuestion(e){
   e.preventDefault();
   if(!editingExam)return;
   setBusy(true);
 
-  let imageUrl=null;
+  let imageUrl=editingQuestion?.image_url??null;
 
   if(draftImage){
     const fileExt=draftImage.name.split('.').pop();
@@ -112,13 +114,21 @@ async function addQuestion(e){
     type:draft.type,
     prompt:draft.prompt,
     points:Number(draft.points),
-    position:examQuestions.length+1,
-    options:draft.type==='multiple_choice'?draft.options.filter(x=>x.trim()):null,
-    correct_answer:['multiple_choice','short_answer'].includes(draft.type)?draft.correct_answer.trim():null,
+    position:editingQuestion
+      ?editingQuestion.position
+      :examQuestions.length+1,
+    options:draft.type==='multiple_choice'
+      ?draft.options.filter(x=>x.trim())
+      :null,
+    correct_answer:['multiple_choice','short_answer'].includes(draft.type)
+      ?draft.correct_answer.trim()
+      :null,
     image_url:imageUrl
   };
 
-  const {error}=await supabase.from('questions').insert(payload);
+  const {error}=editingQuestion
+    ?await supabase.from('questions').update(payload).eq('id',editingQuestion.id)
+    :await supabase.from('questions').insert(payload);
 
   setBusy(false);
 
@@ -127,13 +137,38 @@ async function addQuestion(e){
     return;
   }
 
-  setDraft({type:'multiple_choice',prompt:'',options:['','','',''],correct_answer:'',points:1});
+  const wasEditing=Boolean(editingQuestion);
+
+  setDraft({
+    type:'multiple_choice',
+    prompt:'',
+    options:['','','',''],
+    correct_answer:'',
+    points:1
+  });
   setDraftImage(null);
-  setMsg('Soal berhasil ditambahkan.');
+  setEditingQuestion(null);
+  setMsg(wasEditing
+    ?'Perubahan soal berhasil disimpan.'
+    :'Soal berhasil ditambahkan.');
+
   loadQuestions(editingExam.id);
 }
 
-  async function deleteQuestion(id){
+function editQuestion(q){
+  setEditingQuestion(q);
+  setDraft({
+    type:q.type,
+    prompt:q.prompt||'',
+    options:q.options||['','','',''],
+    correct_answer:q.correct_answer||'',
+    points:q.points??1
+  });
+  setDraftImage(null);
+  setMsg('Sedang mengedit soal. Silakan perbaiki, lalu simpan perubahan.');
+  window.scrollTo({top:0,behavior:'smooth'});
+}  
+async function deleteQuestion(id){
     if(!confirm('Hapus soal ini?'))return;
     const {error}=await supabase.from('questions').delete().eq('id',id);
     if(error)setMsg(error.message);else loadQuestions(editingExam.id);
@@ -363,7 +398,7 @@ function exportGradesCSV(){
     {page==='manage'&&editingExam&&<>
       <div className="toolbar"><div><span className="eyebrow">PENGELOLAAN SOAL</span><h2>{editingExam.title}</h2><p>Kode ujian: <b>{editingExam.code}</b></p></div><button className="ghost" onClick={()=>setPage('admin')}>← Dashboard</button></div>
       <div className="grid two">
-        <section className="panel"><h3>Tambah soal</h3><form onSubmit={addQuestion}>
+        <section className="panel"><h3>{editingQuestion?'Edit soal':'Tambah soal'}</h3><form onSubmit={addQuestion}>
           <Field label="Jenis soal"><select value={draft.type} onChange={e=>setDraft({...draft,type:e.target.value})}>
             <option value="multiple_choice">Pilihan ganda</option><option value="short_answer">Isian singkat</option><option value="essay">Uraian</option>
           </select></Field>
@@ -398,12 +433,15 @@ function exportGradesCSV(){
           </>}
           {draft.type==='short_answer'&&<Field label="Kunci jawaban"><input required value={draft.correct_answer} onChange={e=>setDraft({...draft,correct_answer:e.target.value})}/></Field>}
           <Field label="Bobot nilai"><input type="number" min="0" step="0.5" value={draft.points} onChange={e=>setDraft({...draft,points:e.target.value})}/></Field>
-          <button className="primary" disabled={busy}>Simpan soal</button>
+          <button className="primary" disabled={busy}>
+  {busy?'Menyimpan...':editingQuestion?'Simpan Perubahan':'Tambah Soal'}
+</button>
         </form></section>
         <section className="panel"><h3>Soal tersimpan ({examQuestions.length})</h3>
           {examQuestions.map((q,i)=><div className="questionrow" key={q.id}>
             <div><b>{i+1}. {q.prompt}</b><small>{q.type==='multiple_choice'?'Pilihan ganda':q.type==='short_answer'?'Isian singkat':'Uraian'} · {q.points} poin</small></div>
-            <button className="danger small" onClick={()=>deleteQuestion(q.id)}>Hapus</button>
+            <button className="small" onClick={()=>editQuestion(q)}>Edit</button>
+<button className="danger small" onClick={()=>deleteQuestion(q.id)}>Hapus</button>
           </div>)}
         </section>
       </div>
@@ -481,7 +519,7 @@ function exportGradesCSV(){
         <section className="panel questionpanel">
           
 <div className="qmeta">SOAL {idx+1} DARI {questions.length} · {current.points} POIN</div>
-<h3>{current.prompt}</h3>
+<h3 style={{whiteSpace:'pre-line'}}>{current.prompt}</h3>
 
 {current.image_url&&(
   <div style={{margin:'16px 0'}}>
