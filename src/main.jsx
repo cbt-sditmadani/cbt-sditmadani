@@ -549,11 +549,14 @@ function exportGradesCSV(){
     </>}
 
     {page==='done'&&<section className="panel centered">
-      <div className="check">✓</div><h2>Ujian berhasil dikumpulkan</h2><p>Terima kasih, {student.name}. Jawaban Anda telah disimpan.</p>
-      {result?.objective_score!=null&&<p>Nilai objektif: <b>{result.objective_score}</b></p>}
-      <button className="primary" onClick={()=>{setPage('home');setStudent({name:'',class_name:'',code:''});setMsg('');}}>Kembali ke halaman awal</button>
-    </section>}
-
+  <div className="check">✓</div>
+  <h2>Ujian berhasil dikumpulkan</h2>
+  <p>Terima kasih, {student.name}. Jawaban Anda telah disimpan.</p>
+  <button className="primary" onClick={()=>{setPage('home');setStudent({name:'',class_name:'',code:''});setMsg('');}}>
+    Kembali ke halaman awal
+  </button>
+</section>}
+     
     <footer>
   © {new Date().getFullYear()} Hak Cipta Dilindungi.
   <br/>
