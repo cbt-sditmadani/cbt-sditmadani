@@ -363,13 +363,19 @@ function exportGradesCSV(){
           <button disabled={busy} className="primary wide">{busy?'Memproses...':'Mulai Ujian'}</button>
         </form>
       </section>
-      <section className="panel soft"><span className="eyebrow">PENGELOLA</span><h2>Login Guru / Admin</h2><p>Masuk untuk membuat ujian, mengelola soal, dan melihat hasil.</p>
-        <form onSubmit={signIn}>
-          <Field label="Email administrator"><input type="email" required value={adminEmail} onChange={e=>setAdminEmail(e.target.value)}/></Field>
-          <Field label="Kata sandi"><input type="password" required value={adminPassword} onChange={e=>setAdminPassword(e.target.value)}/></Field>
-          <button disabled={busy} className="secondary wide">Masuk Dashboard</button>
-        </form>
-      </section>
+      <details className="panel soft">
+  <summary>Login untuk Guru/Admin</summary>
+  <section>
+    <span className="eyebrow">PENGELOLA</span>
+    <h2>Login Guru / Admin</h2>
+    <p>Masuk untuk membuat ujian, mengelola soal, dan melihat hasil.</p>
+    <form onSubmit={signIn}>
+      <Field label="Email administrator"><input type="email" required value={adminEmail} onChange={e=>setAdminEmail(e.target.value)}/></Field>
+      <Field label="Kata sandi"><input type="password" required value={adminPassword} onChange={e=>setAdminPassword(e.target.value)}/></Field>
+      <button disabled={busy} className="secondary wide">Masuk Dashboard</button>
+    </form>
+  </section>
+</details>
     </div>}
 
     {page==='admin'&&<>
