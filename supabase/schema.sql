@@ -17,7 +17,7 @@ create table if not exists public.exams (
 create table if not exists public.questions (
   id uuid primary key default gen_random_uuid(),
   exam_id uuid not null references public.exams(id) on delete cascade,
-  type text not null check(type in ('multiple_choice','short_answer','essay')),
+  type text not null check(type in ('multiple_choice','multiple_choice_complex','matching','short_answer','essay')),
   prompt text not null,
   options jsonb,
   correct_answer text,

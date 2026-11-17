@@ -140,6 +140,51 @@ function App(){
     if(error)setMsg(error.message);else loadExams();
   }
 
+async function editExamTitle(e){
+  const newTitle=window.prompt(
+    'Masukkan nama mata pelajaran/ujian yang benar:',
+    e.title
+  );
+
+  if(newTitle===null)return;
+
+  const title=newTitle.trim();
+
+  if(!title){
+    setMsg('Nama mata pelajaran tidak boleh kosong.');
+    return;
+  }
+
+  if(title===e.title)return;
+
+  setBusy(true);
+  setMsg('');
+
+  const {data,error}=await supabase
+    .from('exams')
+    .update({title})
+    .eq('id',e.id)
+    .select()
+    .single();
+
+  setBusy(false);
+
+  if(error){
+    setMsg('Gagal memperbarui nama mata pelajaran: '+error.message);
+    return;
+  }
+
+  setExams(prev=>prev.map(item=>
+    item.id===e.id?data:item
+  ));
+
+  setEditingExam(current=>
+    current?.id===e.id?data:current
+  );
+
+  setMsg('Nama mata pelajaran berhasil diperbarui.');
+}
+
 async function addQuestion(e){
   e.preventDefault();
   if(!editingExam)return;
@@ -644,8 +689,27 @@ function exportGradesCSV(){
           {exams.length===0?<p>Belum ada ujian.</p>:exams.map(e=><div className="examrow" key={e.id}>
             <div><b>{e.title}</b><small>Kode: {e.code} · {e.duration_minutes} menit · {e.is_active?'Aktif':'Nonaktif'}</small></div>
             <div className="actions">
-              <button className="small" onClick={()=>{setEditingExam(e);loadQuestions(e.id);setPage('manage');}}>Soal</button>
-              <button className="small" onClick={()=>openGrades(e)}>Hasil</button>
+  	     <button
+    		className="small"
+    		disabled={busy}
+    		onClick={()=>editExamTitle(e)}
+  	     >
+    		Edit Mata Pelajaran
+  	     </button>
+
+  	     <button
+    		className="small"
+    		onClick={()=>{setEditingExam(e);loadQuestions(e.id);setPage('manage');}}
+  	     >
+    		Soal
+  	     </button>
+
+  	     <button
+    		className="small"
+    		onClick={()=>openGrades(e)}
+  	     >
+    		Hasil
+  	     </button>
               <button className="small" onClick={()=>toggleExam(e)}>{e.is_active?'Tutup':'Aktifkan'}</button>
 {!e.is_active&&<button className="small" onClick={()=>deleteExam(e)}>Hapus</button>}
             </div>
@@ -1159,6 +1223,18 @@ const complexStatusClass=
     <p>{response.trim()?response:'Belum dijawab'}</p>
   )}
 </div>
+
+{q.type==='short_answer' && (
+  <div className="answerbox">
+    <b>Kunci Jawaban:</b>
+    <p>
+      {q.correct_answer?.trim()
+        ? q.correct_answer
+        : 'Kunci jawaban belum diisi'}
+    </p>
+  </div>
+)}
+
 
             {isObjective&&<>
 <p><b>Kunci jawaban:</b></p>
