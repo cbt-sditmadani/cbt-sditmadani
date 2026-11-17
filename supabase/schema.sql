@@ -61,22 +61,82 @@ create policy "admins grade attempts" on public.attempts for update to authentic
 create policy "admins read answers" on public.answers for select to authenticated using(public.is_admin());
 
 -- Peserta tidak diberi akses SELECT langsung ke tabel soal/kunci. Akses hanya melalui RPC berikut.
-create or replace function public.student_start_exam(p_code text,p_name text,p_class text)
-returns jsonb language plpgsql security definer set search_path=public
+create or replace function public.student_start_exam(
+  p_code text,
+  p_name text,
+  p_class text,
+  p_birth_date date,
+  p_exam_number text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public
 as $$
-declare e public.exams%rowtype; a public.attempts%rowtype; q jsonb; seconds_left int;
+declare
+  e public.exams%rowtype;
+  a public.attempts%rowtype;
+  q jsonb;
+  seconds_left int;
 begin
-  if length(trim(coalesce(p_name,'')))<2 or length(trim(coalesce(p_class,'')))<1 then raise exception 'Nama dan kelas wajib diisi.'; end if;
-  select * into e from public.exams where code=upper(trim(p_code)) and is_active=true;
-  if not found then raise exception 'Kode ujian tidak ditemukan atau ujian belum aktif.'; end if;
-  insert into public.attempts(exam_id,student_name,class_name) values(e.id,trim(p_name),trim(p_class)) returning * into a;
-  select coalesce(jsonb_agg(jsonb_build_object('id',id,'type',type,'prompt',prompt,'options',options,'points',points,'position',position) order by position),'[]'::jsonb)
-    into q from public.questions where exam_id=e.id;
-  if jsonb_array_length(q)=0 then raise exception 'Soal ujian belum tersedia.'; end if;
-  seconds_left:=e.duration_minutes*60;
-  return jsonb_build_object('exam',jsonb_build_object('id',e.id,'title',e.title,'attempt_id',a.id),'questions',q,'answers','{}'::jsonb,'remaining_seconds',seconds_left);
-end; $$;
+  if length(trim(coalesce(p_name,'')))<2
+     or length(trim(coalesce(p_class,'')))<1
+     or p_birth_date is null
+     or length(trim(coalesce(p_exam_number,'')))<1 then
+    raise exception 'Nama, kelas, tanggal lahir, dan nomor ujian wajib diisi.';
+  end if;
 
+  select * into e
+  from public.exams
+  where code=upper(trim(p_code)) and is_active=true;
+
+  if not found then
+    raise exception 'Kode ujian tidak ditemukan atau ujian belum aktif.';
+  end if;
+
+  insert into public.attempts(
+    exam_id,student_name,class_name,birth_date,exam_number
+  )
+  values(
+    e.id,trim(p_name),trim(p_class),p_birth_date,trim(p_exam_number)
+  )
+  returning * into a;
+
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'id',id,
+        'type',type,
+        'prompt',prompt,
+        'options',options,
+        'points',points,
+        'position',position
+      ) order by position
+    ),
+    '[]'::jsonb
+  )
+  into q
+  from public.questions
+  where exam_id=e.id;
+
+  if jsonb_array_length(q)=0 then
+    raise exception 'Soal ujian belum tersedia.';
+  end if;
+
+  seconds_left:=e.duration_minutes*60;
+
+  return jsonb_build_object(
+    'exam',jsonb_build_object(
+      'id',e.id,
+      'title',e.title,
+      'attempt_id',a.id
+    ),
+    'questions',q,
+    'answers','{}'::jsonb,
+    'remaining_seconds',seconds_left
+  );
+end;
+$$;
 create or replace function public.student_save_answer(p_attempt_id uuid,p_question_id uuid,p_answer text)
 returns boolean language plpgsql security definer set search_path=public
 as $$
