@@ -98,7 +98,15 @@ function App(){
     const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));
     return ()=>subscription.unsubscribe();
   },[]);
-  useEffect(()=>{if(session){setPage('admin');loadExams();}},[session]);
+  useEffect(()=>{
+  if(session){
+    loadExams();
+
+    setPage(currentPage =>
+      currentPage==='home' ? 'admin' : currentPage
+    );
+  }
+},[session]);
   useEffect(()=>{
     if(page!=='taking')return;
     const timer=setInterval(()=>setRemaining(v=>{
