@@ -106,15 +106,54 @@ function App(){
       currentPage==='home' ? 'admin' : currentPage
     );
   }
-},[session]);
+},[session]);  
+
+  // Timer hitung mundur peserta
   useEffect(()=>{
     if(page!=='taking')return;
+
     const timer=setInterval(()=>setRemaining(v=>{
-      if(v<=1){clearInterval(timer);finishExam(true);return 0;}
+      if(v<=1){
+        clearInterval(timer);
+        finishExam(true);
+        return 0;
+      }
       return v-1;
     }),1000);
+
     return ()=>clearInterval(timer);
   },[page]);
+
+  // Periksa sisa waktu terbaru dari Supabase setiap 5 detik
+  useEffect(()=>{
+    if(page!=='taking'||!exam?.attempt_id)return;
+
+    let active=true;
+
+    async function syncRemaining(){
+      try{
+        const latest=await call(
+          'student_get_exam_remaining',
+          {p_attempt_id:exam.attempt_id}
+        );
+
+        if(active&&latest!==null&&latest!==undefined){
+          setRemaining(Number(latest));
+        }
+      }catch(err){
+        // Jika koneksi terganggu, timer lokal tetap berjalan.
+      }
+    }
+
+    syncRemaining();
+
+    const syncTimer=setInterval(syncRemaining,5000);
+
+    return ()=>{
+      active=false;
+      clearInterval(syncTimer);
+    };
+  },[page,exam?.attempt_id]);
 
   const current=questions[idx];
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
@@ -125,7 +164,9 @@ function App(){
   }
   async function signIn(e){
     e.preventDefault();setBusy(true);setMsg('');
-    const {error}=await supabase.auth.signInWithPassword({email:adminEmail,password:adminPassword});
+    const {data,error}=await supabase.auth.signInWithPassword({email:adminEmail,password:adminPassword});
+console.log('Login berhasil:',Boolean(data.session));
+console.log('User ID:',data.session?.user?.id);
     setBusy(false);if(error)setMsg(error.message);
   }
   async function logout(){await supabase.auth.signOut();setPage('home');}
@@ -191,6 +232,52 @@ async function editExamTitle(e){
   );
 
   setMsg('Nama mata pelajaran berhasil diperbarui.');
+}
+
+async function editExamDuration(e){
+  const newDuration=window.prompt(
+    'Masukkan durasi ujian dalam menit (1–300):',
+    String(e.duration_minutes)
+  );
+
+  if(newDuration===null)return;
+
+  const duration=Number(newDuration);
+
+  if(!Number.isInteger(duration)||duration<1||duration>300){
+    setMsg('Durasi harus berupa bilangan bulat antara 1 sampai 300 menit.');
+    return;
+  }
+
+  if(duration===Number(e.duration_minutes))return;
+
+  setBusy(true);
+  setMsg('');
+
+  const {data,error}=await supabase.rpc(
+    'admin_update_exam_duration',
+   {
+    p_exam_id:e.id,
+    p_duration:duration
+   }
+  );
+
+  setBusy(false);
+
+  if(error){
+    setMsg('Gagal memperbarui durasi: '+error.message);
+    return;
+  }
+
+  setExams(prev=>prev.map(item=>
+    item.id===e.id?data:item
+  ));
+
+  setEditingExam(current=>
+    current?.id===e.id?data:current
+  );
+
+  setMsg('Durasi ujian berhasil diperbarui.');
 }
 
 async function addQuestion(e){
@@ -704,6 +791,13 @@ function exportGradesCSV(){
   	     >
     		Edit Mata Pelajaran
   	     </button>
+	    <button
+  		className="small"
+  		disabled={busy}
+  		onClick={()=>editExamDuration(e)}
+	    >
+  		Edit Durasi
+	    </button>
 
   	     <button
     		className="small"
