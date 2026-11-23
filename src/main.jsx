@@ -500,36 +500,59 @@ async function startExam(e){
       p_exam_number:student.exam_number.trim()
     });
 
-    // Acak pilihan jawaban untuk soal menjodohkan
-const shuffledQuestions=(data.questions||[]).map(question=>{
+    
+// Siapkan soal dan pilihan menjodohkan tanpa mengacak pilihan jawabannya
+const preparedQuestions=(data.questions||[]).map(question=>{
   if(question.type!=='matching' ||
      !Array.isArray(question.options)){
     return question;
   }
 
-  const rightChoices=[
-    ...question.options.map((pair,index)=>({
-      text:pair.right,
-      right_index:index
-    })),
-    {
-      text:question.matching_distractor,
-      right_index:-1
-    }
-  ];
-
-  // Pengacakan Fisher-Yates
-  for(let i=rightChoices.length-1;i>0;i--){
-    const j=Math.floor(Math.random()*(i+1));
-    [rightChoices[i],rightChoices[j]]=
-      [rightChoices[j],rightChoices[i]];
-  }
-
   return {
     ...question,
-    matching_choices:rightChoices
+    matching_choices:[
+      ...question.options.map((pair,index)=>({
+        text:pair.right,
+        right_index:index
+      })),
+      {
+        text:question.matching_distractor,
+        right_index:-1
+      }
+    ]
   };
 });
+
+// Acak urutan soal berdasarkan ID percobaan peserta
+// Dengan cara ini, urutan soal tetap sama ketika peserta masuk kembali
+function seededRandom(seedText){
+  let seed=2166136261;
+
+  for(let i=0;i<seedText.length;i++){
+    seed^=seedText.charCodeAt(i);
+    seed=Math.imul(seed,16777619);
+  }
+
+  return function(){
+    seed+=0x6D2B79F5;
+    let t=seed;
+    t=Math.imul(t^(t>>>15),t|1);
+    t^=t+Math.imul(t^(t>>>7),t|61);
+    return ((t^(t>>>14))>>>0)/4294967296;
+  };
+}
+
+const shuffledQuestions=[...preparedQuestions];
+const random=seededRandom(String(data.exam.attempt_id));
+
+for(let i=shuffledQuestions.length-1;i>0;i--){
+  const j=Math.floor(random()*(i+1));
+
+  [shuffledQuestions[i],shuffledQuestions[j]]=[
+    shuffledQuestions[j],
+    shuffledQuestions[i]
+  ];
+}
 
     setExam(data.exam);
     setQuestions(shuffledQuestions);
